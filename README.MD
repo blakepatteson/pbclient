@@ -8,19 +8,19 @@ The pbclient package provides a Go API to interact with Pocketbase, allowing ope
 such as authentication, fetching logs, creating records, fetching records by ID,
 filtering records, and updating records.
 
-The package utilizes the gorequests/requests package for making HTTP requests.
+The package utilizes the `requests` package from github.com/blakepatteson/gorequests
+(a simple http wrapper) for making HTTP requests."
 
 ## Features
 
-- Authentication as admin or user.
-- Fetch logs.
-- Create new records in a specified collection.
-- Get records from a collection with optional parameters like filter and expand.
-- Fetch a record by its ID.
-- Get records based on a filter.
-- Get all records from a collection with optional parameters.
-- Update an existing record.
-- Support for both filters and expand for complex queries.
+- Authenticating as admin or user.
+- Fetching logs.
+- Creating new records in a specified collection.
+- Getting records from a collection with optional parameters like filter and expand.
+- Getting records by ID.
+- Geting all records from a collection.
+- Updating an existing record.
+- Filtering and expanding results for more complex queries
 
 ## Initialization
 
@@ -57,6 +57,12 @@ filteredRecords, err := pb.GetFilteredRecords("collectionName", "your-filter-str
 ```go
 updatedId, err := pb.UpdateRecord("collectionName",
                         `{"someKey":"someValue","anotherField":"anotherValue"}`, "recordId")
+```
+
+## Deleting a record
+
+```go
+statusCode, err := pb.DeleteRecord("collectionName", "0f8l6f7zm98vhle")
 ```
 
 ## Parsing Pocketbase time format

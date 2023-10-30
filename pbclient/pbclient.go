@@ -50,10 +50,10 @@ func NewPocketbase(baseUrl, username, password string, isAdmin bool) (*Pocketbas
 	}, nil
 }
 
-func authenticate(endpoint, pbEndpoint, identity, password string) (string, error) {
+func authenticate(authEndpoint, baseEndpoint, identity, password string) (string, error) {
 	authJson := []byte(fmt.Sprintf(`{"identity":"%v","password":"%v"}`, identity, password))
 	response, err := requests.HttpRequest{
-		Endpoint:    pbEndpoint + endpoint,
+		Endpoint:    fmt.Sprintf("%v%v", baseEndpoint, authEndpoint),
 		VerbHTTP:    "POST",
 		ContentType: "application/json",
 		JSON:        authJson,
@@ -113,14 +113,14 @@ func (p *Pocketbase) GetAllLogs() ([]map[string]any, error) {
 		return results, nil
 	}
 	allResults := results
-	whichPage := 2
+	pg := 2
 	for len(allResults) < totRecs {
-		results, totRecs, err = p.getLogs(whichPage)
+		results, totRecs, err = p.getLogs(pg)
 		if err != nil {
 			return nil, err
 		}
 		allResults = append(allResults, results...)
-		whichPage += 1
+		pg += 1
 	}
 	return allResults, nil
 }
@@ -226,7 +226,7 @@ func (p *Pocketbase) GetAllRecords(collectionName, filter string, expand string)
 }
 
 func (p *Pocketbase) UpdateRecord(collectionName, update, id string) (string, error) {
-	endpoint := p.baseEndpoint + fmt.Sprintf("/api/collections/%v/records/%v", collectionName, id)
+	endpoint := fmt.Sprintf("%v/api/collections/%v/records/%v", p.baseEndpoint, collectionName, id)
 	response, err := requests.HttpRequest{
 		Endpoint:    endpoint,
 		ContentType: "application/json",
@@ -256,7 +256,7 @@ func ParseTimePB(input string) (*time.Time, error) {
 }
 
 func (p *Pocketbase) DeleteRecord(collectionName, recordId string) (int, error) {
-	deleteEndpoint := p.baseEndpoint + fmt.Sprintf("/api/collections/%v/records/%v", collectionName, recordId)
+	deleteEndpoint := fmt.Sprintf("%v/api/collections/%v/records/%v", p.baseEndpoint, collectionName, recordId)
 	response, err := requests.HttpRequest{
 		Endpoint:    deleteEndpoint,
 		ContentType: "application/json",
