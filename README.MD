@@ -8,7 +8,7 @@ The pbclient package provides a Go API to interact with Pocketbase, allowing ope
 such as authentication, fetching logs, creating records, fetching records by ID,
 filtering records, and updating records.
 
-The package utilizes the `requests` package from github.com/blakepatteson/gorequests
+The package utilizes the `requests` package from [github.com/blakepatteson/gorequests/requests](github.com/blakepatteson/gorequests/requests)
 (a simple http wrapper) for making HTTP requests."
 
 ## Features
@@ -65,12 +65,6 @@ updatedId, err := pb.UpdateRecord("collectionName",
 statusCode, err := pb.DeleteRecord("collectionName", "0f8l6f7zm98vhle")
 ```
 
-## Parsing Pocketbase time format
-
-```go
-parsedTime, err := ParseTimePB("your-time-string")
-```
-
 ## Dependencies
 
 [github.com/blakepatteson/gorequests/requests](github.com/blakepatteson/gorequests/requests)
@@ -80,7 +74,8 @@ parsedTime, err := ParseTimePB("your-time-string")
 To run tests for the pbclient package, you'll need to have a local instance of PocketBase
 running. You can easily set this up using the provided Dockerfile in the repository.
 
-Setting up PocketBase locally
+## Setting up PocketBase locally
+
 Ensure you have Docker installed on your machine.
 
 Navigate to the root directory of the repository and build the Docker image using the
@@ -88,6 +83,13 @@ provided Dockerfile:
 
 ```bash
 sh buildLocalPb.sh
+```
+
+or just
+
+```
+docker build -t pocketbase-local .
+docker run -p 8080:8080 pocketbase-local
 ```
 
 This script will use the Dockerfile to create a local PocketBase image and start a
