@@ -2,6 +2,7 @@ package pbclient
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"time"
 
@@ -252,4 +253,18 @@ func ParseTimePB(input string) (*time.Time, error) {
 		return nil, fmt.Errorf("err parsing time : %w", err)
 	}
 	return &time, nil
+}
+
+func (p *Pocketbase) DeleteRecord(collectionName, recordId string) (int, error) {
+	deleteEndpoint := p.baseEndpoint + fmt.Sprintf("/api/collections/%v/records/%v", collectionName, recordId)
+	response, err := requests.HttpRequest{
+		Endpoint:    deleteEndpoint,
+		ContentType: "application/json",
+		VerbHTTP:    "DELETE",
+		Auth:        p.auth,
+	}.Do()
+	if err != nil {
+		return http.StatusBadRequest, fmt.Errorf("err deleting PB DB records. Details : '%v'", err)
+	}
+	return response.StatusCode, nil
 }
