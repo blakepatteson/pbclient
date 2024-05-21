@@ -12,7 +12,7 @@ import (
 type Pocketbase struct {
 	BaseEndpoint string
 	Username     string
-	Password     string
+	password     string
 	AuthToken    string
 }
 
@@ -45,7 +45,7 @@ func NewPocketbase(baseUrl, username, password string, isAdmin bool) (*Pocketbas
 	return &Pocketbase{
 		BaseEndpoint: baseUrl,
 		Username:     username,
-		Password:     password,
+		password:     password,
 		AuthToken:    authToken,
 	}, nil
 }
