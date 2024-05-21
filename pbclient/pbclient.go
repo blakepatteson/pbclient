@@ -10,10 +10,10 @@ import (
 )
 
 type Pocketbase struct {
-	baseEndpoint string
-	username     string
-	password     string
-	auth         string
+	BaseEndpoint string
+	Username     string
+	Password     string
+	AuthToken    string
 }
 
 type Params struct {
@@ -43,10 +43,10 @@ func NewPocketbase(baseUrl, username, password string, isAdmin bool) (*Pocketbas
 		}
 	}
 	return &Pocketbase{
-		baseEndpoint: baseUrl,
-		username:     username,
-		password:     password,
-		auth:         authToken,
+		BaseEndpoint: baseUrl,
+		Username:     username,
+		Password:     password,
+		AuthToken:    authToken,
 	}, nil
 }
 
@@ -79,12 +79,12 @@ func (p *Pocketbase) getLogs(page int) ([]map[string]any, int, error) {
 }
 
 func (p *Pocketbase) CreateRecord(collectionName, update string) (string, error) {
-	endpoint := fmt.Sprintf("%s/api/collections/%v/records", p.baseEndpoint, collectionName)
+	endpoint := fmt.Sprintf("%s/api/collections/%v/records", p.BaseEndpoint, collectionName)
 	response, err := requests.HttpRequest{
 		Endpoint:    endpoint,
 		ContentType: "application/json",
 		VerbHTTP:    "POST",
-		Auth:        p.auth,
+		Auth:        p.AuthToken,
 		JSON:        []byte(update),
 	}.Do()
 
@@ -127,7 +127,7 @@ func (p *Pocketbase) GetAllLogs() ([]map[string]any, error) {
 
 func (p *Pocketbase) getData(getDataEndpoint string, params Params) ([]map[string]any, int, error) {
 	// Build the endpoint URL with query parameters
-	getEndpoint := fmt.Sprintf("%s%s?page=%d&perPage=%v", p.baseEndpoint, getDataEndpoint, params.Page, MAX_PER_PAGE)
+	getEndpoint := fmt.Sprintf("%s%s?page=%d&perPage=%v", p.BaseEndpoint, getDataEndpoint, params.Page, MAX_PER_PAGE)
 	if params.Filter != "" {
 		getEndpoint += "&filter=" + url.QueryEscape(params.Filter)
 	}
@@ -138,7 +138,7 @@ func (p *Pocketbase) getData(getDataEndpoint string, params Params) ([]map[strin
 		Endpoint:    getEndpoint,
 		ContentType: "application/json",
 		VerbHTTP:    "GET",
-		Auth:        p.auth,
+		Auth:        p.AuthToken,
 	}.Do()
 	if err != nil {
 		return nil, 0, fmt.Errorf("err getting data from pb db : %w", err)
@@ -161,10 +161,10 @@ func (p *Pocketbase) getRecords(collectionName string, params Params) ([]map[str
 func (p *Pocketbase) GetRecordById(collectionName, id string) (map[string]any, error) {
 	response, err := requests.HttpRequest{
 		Endpoint: fmt.Sprintf("%v/api/collections/%v/records/%v",
-			p.baseEndpoint, collectionName, id),
+			p.BaseEndpoint, collectionName, id),
 		ContentType: "application/json",
 		VerbHTTP:    "GET",
-		Auth:        p.auth,
+		Auth:        p.AuthToken,
 	}.Do()
 	if err != nil {
 		fmt.Println("err getting filtered db records : ", err, response)
@@ -175,10 +175,10 @@ func (p *Pocketbase) GetRecordById(collectionName, id string) (map[string]any, e
 func (p *Pocketbase) GetFilteredRecords(collectionName, filter string) ([]map[string]any, error) {
 	response, err := requests.HttpRequest{
 		Endpoint: fmt.Sprintf("%v/api/collections/%v/records?page=1&filter=%v",
-			p.baseEndpoint, collectionName, url.QueryEscape(filter)),
+			p.BaseEndpoint, collectionName, url.QueryEscape(filter)),
 		ContentType: "application/json",
 		VerbHTTP:    "GET",
-		Auth:        p.auth,
+		Auth:        p.AuthToken,
 	}.Do()
 	if err != nil {
 		fmt.Println("err getting filtered db records : ", err)
@@ -226,12 +226,12 @@ func (p *Pocketbase) GetAllRecords(collectionName, filter string, expand string)
 }
 
 func (p *Pocketbase) UpdateRecord(collectionName, update, id string) (string, error) {
-	endpoint := fmt.Sprintf("%v/api/collections/%v/records/%v", p.baseEndpoint, collectionName, id)
+	endpoint := fmt.Sprintf("%v/api/collections/%v/records/%v", p.BaseEndpoint, collectionName, id)
 	response, err := requests.HttpRequest{
 		Endpoint:    endpoint,
 		ContentType: "application/json",
 		VerbHTTP:    "PATCH",
-		Auth:        p.auth,
+		Auth:        p.AuthToken,
 		JSON:        []byte(update),
 	}.Do()
 	if err != nil {
@@ -256,12 +256,12 @@ func ParseTimePB(input string) (*time.Time, error) {
 }
 
 func (p *Pocketbase) DeleteRecord(collectionName, recordId string) (int, error) {
-	deleteEndpoint := fmt.Sprintf("%v/api/collections/%v/records/%v", p.baseEndpoint, collectionName, recordId)
+	deleteEndpoint := fmt.Sprintf("%v/api/collections/%v/records/%v", p.BaseEndpoint, collectionName, recordId)
 	response, err := requests.HttpRequest{
 		Endpoint:    deleteEndpoint,
 		ContentType: "application/json",
 		VerbHTTP:    "DELETE",
-		Auth:        p.auth,
+		Auth:        p.AuthToken,
 	}.Do()
 	if err != nil {
 		return http.StatusBadRequest, fmt.Errorf("err deleting PB DB records. Details : '%v'", err)
