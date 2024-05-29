@@ -270,15 +270,15 @@ func (pb *Pocketbase) DeleteRecord(collectionName, recordId string) (int, error)
 	return response.StatusCode, nil
 }
 
-func AuthRefresh(authToken, baseEndpoint string) (int, error) {
+func AuthRefresh(authToken, baseEndpoint string) (*Pocketbase, error) {
 	endpt := fmt.Sprintf("%v/api/collections/users/auth-refresh", baseEndpoint)
-	response, err := requests.HttpRequest{
+	_, err := requests.HttpRequest{
 		Endpoint: endpt,
 		Auth:     authToken,
 	}.Do()
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("err refreshing auth : '%v'", err)
+		return nil, fmt.Errorf("err refreshing auth : '%v'", err)
 	}
 
-	return response.StatusCode, nil
+	return &Pocketbase{BaseEndpoint: baseEndpoint, AuthToken: authToken}, nil
 }
