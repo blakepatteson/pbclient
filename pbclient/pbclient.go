@@ -275,6 +275,7 @@ func AuthRefresh(authToken, baseEndpoint string) (*Pocketbase, error) {
 	_, err := requests.HttpRequest{
 		Endpoint: endpt,
 		Auth:     authToken,
+		VerbHTTP: "POST",
 	}.Do()
 	if err != nil {
 		return nil, fmt.Errorf("err refreshing auth : '%v'", err)
