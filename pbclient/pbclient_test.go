@@ -28,7 +28,8 @@ func TestAuthenticate(t *testing.T) {
 	for _, tt := range tests {
 		_, err := authenticate(ADMIN_AUTH_ENDPOINT, "http://0.0.0.0:8080", tt.identity, tt.password)
 		if (err != nil) != tt.wantErr {
-			t.Errorf("authenticate() with identity = %v, password = %v, error = %v, wantErr = %v", tt.identity, tt.password, err, tt.wantErr)
+			t.Errorf("authenticate() with identity = %v, password = %v, error = %v, wantErr = %v",
+				tt.identity, tt.password, err, tt.wantErr)
 		}
 	}
 }
