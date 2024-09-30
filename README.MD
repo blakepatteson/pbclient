@@ -8,7 +8,7 @@ The pbclient package provides a Go API to interact with Pocketbase, allowing ope
 such as authentication, fetching logs, creating records, fetching records by ID,
 filtering records, and updating records.
 
-The package utilizes the `requests` package from [https://github.com/blakepatteson/gorequests](github.com/blakepatteson/gorequests)
+The package utilizes the `requests` package from [github.com/blakepatteson/gorequests](https://github.com/blakepatteson/gorequests)
 (a simple http wrapper) for making HTTP requests."
 
 ## Features
@@ -67,7 +67,7 @@ statusCode, err := pb.DeleteRecord("collectionName", "0f8l6f7zm98vhle")
 
 ## Dependencies
 
-[https://github.com/blakepatteson/gorequests](github.com/blakepatteson/gorequests)
+[github.com/blakepatteson/gorequests](https://github.com/blakepatteson/gorequests)
 
 ## Testing
 
