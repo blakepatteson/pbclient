@@ -1,2 +1,4 @@
 github.com/blakepatteson/gorequests v0.0.0-20231029213326-9e3d47c38c2c h1:tQCRqzZCMVWlIAAhgs9URx53sNcGQbSxA0QUhJK828s=
 github.com/blakepatteson/gorequests v0.0.0-20231029213326-9e3d47c38c2c/go.mod h1:OlOdsZuilZ1wcIOaieYUjxdEH5im5UZWFY2/ELmdmD0=
+github.com/blakepatteson/gorequests v0.0.0-20231030120553-4cfc48f2317f h1:GWemffybiDHxvQB6Od/g/5yIafO0y3Bu6aGFXB39JhI=
+github.com/blakepatteson/gorequests v0.0.0-20231030120553-4cfc48f2317f/go.mod h1:OlOdsZuilZ1wcIOaieYUjxdEH5im5UZWFY2/ELmdmD0=
