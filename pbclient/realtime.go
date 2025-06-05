@@ -17,7 +17,7 @@ import (
 type RealtimeService struct {
 	pb            *Pocketbase
 	clientID      string
-	subscriptions map[string][]func(data interface{})
+	subscriptions map[string][]func(data any)
 	mu            sync.RWMutex
 	eventSource   *eventSource
 	clientIDChan  chan string
@@ -32,7 +32,7 @@ type eventSource struct {
 func (pb *Pocketbase) NewRealtimeService() *RealtimeService {
 	return &RealtimeService{
 		pb:            pb,
-		subscriptions: make(map[string][]func(data interface{})),
+		subscriptions: make(map[string][]func(data any)),
 		clientIDChan:  make(chan string, 1),
 	}
 }
@@ -128,7 +128,7 @@ func (rs *RealtimeService) readEvents() {
 	}
 }
 
-func (rs *RealtimeService) Subscribe(topic string, callback func(data interface{})) error {
+func (rs *RealtimeService) Subscribe(topic string, callback func(data any)) error {
 	if err := rs.connect(); err != nil {
 		return err
 	}
@@ -172,7 +172,8 @@ func (rs *RealtimeService) submitSubscriptions() error {
 
 	// log.Printf("subscription payload: '%v'", string(jsonPayload))
 
-	req, err := http.NewRequest("POST", rs.pb.BaseEndpoint+"/api/realtime", bytes.NewBuffer(jsonPayload))
+	req, err := http.NewRequest("POST", rs.pb.BaseEndpoint+"/api/realtime",
+		bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return fmt.Errorf("err creating request : '%w'", err)
 	}
@@ -191,10 +192,12 @@ func (rs *RealtimeService) submitSubscriptions() error {
 	if err != nil {
 		fmt.Printf("err reading body of subscribe request : '%v'\n", err)
 	}
-	// log.Printf("subscription response: status : '%v', body : '%v'\n", resp.StatusCode, string(body))
+	// log.Printf("subscription response: status : '%v', body : '%v'\n",
+	//  resp.StatusCode, string(body))
 
 	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("unexpected status code : '%v', body : '%v'", resp.StatusCode, string(body))
+		return fmt.Errorf("unexpected status code : '%v', body : '%v'",
+			resp.StatusCode, string(body))
 	}
 
 	// log.Printf("subscriptions submitted successfully\n")

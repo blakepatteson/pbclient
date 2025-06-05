@@ -24,7 +24,7 @@ type Params struct {
 
 const (
 	MAX_PER_PAGE        = 256
-	ADMIN_AUTH_ENDPOINT = "/api/admins/auth-with-password"
+	ADMIN_AUTH_ENDPOINT = "/api/collections/_superusers/auth-with-password"
 	AUTH_ENDPOINT       = "/api/collections/users/auth-with-password"
 )
 
