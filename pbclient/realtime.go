@@ -71,7 +71,11 @@ func (rs *RealtimeService) connect() error {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				fmt.Printf("pbclient.[WARN] : err closing connect resp body : '%v'\n", err)
+			}
+		}()
 		return fmt.Errorf("unexpected status code: '%v'", resp.StatusCode)
 	}
 
@@ -87,7 +91,11 @@ func (rs *RealtimeService) connect() error {
 }
 
 func (rs *RealtimeService) readEvents() {
-	defer rs.eventSource.connection.Body.Close()
+	defer func() {
+		if err := rs.eventSource.connection.Body.Close(); err != nil {
+			fmt.Printf("pbclient.[WARN] : err closing readEvents resp body : '%v'\n", err)
+		}
+	}()
 
 	for {
 		line, err := rs.eventSource.reader.ReadString('\n')
@@ -186,7 +194,11 @@ func (rs *RealtimeService) submitSubscriptions() error {
 	if err != nil {
 		return fmt.Errorf("err performing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("pbclient.[WARN] : err closing submitSubs body : '%v'\n", err)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

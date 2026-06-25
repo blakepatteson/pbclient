@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -49,6 +50,13 @@ func NewPocketbase(baseUrl, un, pw string, isAdmin bool) (*Pocketbase, error) {
 	}, nil
 }
 
+func NewPocketbaseFromToken(baseUrl, token string) *Pocketbase {
+	if !strings.HasPrefix(token, "Bearer ") {
+		token = fmt.Sprintf("Bearer %v", token)
+	}
+	return &Pocketbase{BaseEndpoint: baseUrl, AuthToken: token}
+}
+
 func authenticate(authEndpoint, baseEndpoint, id, pw string) (string, error) {
 	authJson := fmt.Appendf(nil, `{"identity":"%v","password":"%v"}`, id, pw)
 	resp, err := http.Post(
@@ -59,7 +67,11 @@ func authenticate(authEndpoint, baseEndpoint, id, pw string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("err authenticating to db : '%v'", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("pbclient.[WARN] : err closing auth resp body : '%v'\n", err)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -103,7 +115,11 @@ func (pb *Pocketbase) CreateRecord(collectionName, update string) (string, error
 	if err != nil {
 		return "", fmt.Errorf("err creating pb db record : '%v'", err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			fmt.Printf("pbclient.[WARN] : err closing create resp body : '%v'\n", err)
+		}
+	}()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -194,7 +210,11 @@ func getTypedRecords[T any](
 	if err != nil {
 		return nil, 0, fmt.Errorf("err getting data from pb db : '%v'", err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			fmt.Printf("pbclient.[WARN] : err closing getTypedRecs resp body : '%v'\n", err)
+		}
+	}()
 
 	if response.StatusCode != http.StatusOK {
 		return nil, 0, fmt.Errorf("received non-200 response status : %v",
@@ -237,7 +257,11 @@ func (pb *Pocketbase) getData(
 	if err != nil {
 		return nil, 0, fmt.Errorf("err getting data from pb db : '%v'", err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			fmt.Printf("pbclient.[WARN] : err closing getData resp body : '%v'\n", err)
+		}
+	}()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -288,7 +312,11 @@ func (pb *Pocketbase) GetRecordById(collectionName, id string) (map[string]any, 
 	if err != nil {
 		return nil, fmt.Errorf("err getting filtered db records : '%v'", err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			fmt.Printf("pbclient.[WARN] : err closing getRecords resp body : '%v'\n", err)
+		}
+	}()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -322,7 +350,11 @@ func (pb *Pocketbase) GetFilteredRecords(collectionName, filter string) (
 		fmt.Println("err getting filtered db records : ", err)
 		return nil, fmt.Errorf("err getting filtered db records : '%v'", err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			fmt.Printf("pbclient.[WARN] : err closing getFilteredRecs resp body : '%v'\n", err)
+		}
+	}()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -392,7 +424,11 @@ func (pb *Pocketbase) UpdateRecord(collectionName, update, id string) (string, e
 	if err != nil {
 		return "", fmt.Errorf("err updating pb db record : '%v'", err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			fmt.Printf("pbclient.[WARN] : err closing updateRec resp body : '%v'\n", err)
+		}
+	}()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -433,7 +469,11 @@ func (pb *Pocketbase) DeleteRecord(collectionName, recordId string) (int, error)
 	if err != nil {
 		return http.StatusBadRequest, fmt.Errorf("err deleting PB DB rec : '%v'", err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			fmt.Printf("pbclient.[WARN] : err closing deleteRec resp body : '%v'\n", err)
+		}
+	}()
 
 	return response.StatusCode, nil
 }
@@ -452,7 +492,11 @@ func AuthRefresh(authToken, baseEndpoint string) (*Pocketbase, error) {
 	if err != nil {
 		return nil, fmt.Errorf("err refreshing auth : '%v'", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("pbclient.[WARN] : err closing authRefresh resp body : '%v'\n", err)
+		}
+	}()
 
 	return &Pocketbase{BaseEndpoint: baseEndpoint, AuthToken: authToken}, nil
 }
