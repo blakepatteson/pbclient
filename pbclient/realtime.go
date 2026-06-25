@@ -17,7 +17,7 @@ import (
 type RealtimeService struct {
 	pb            *Pocketbase
 	clientID      string
-	subscriptions map[string][]func(data interface{})
+	subscriptions map[string][]func(data any)
 	mu            sync.RWMutex
 	eventSource   *eventSource
 	clientIDChan  chan string
@@ -32,7 +32,7 @@ type eventSource struct {
 func (pb *Pocketbase) NewRealtimeService() *RealtimeService {
 	return &RealtimeService{
 		pb:            pb,
-		subscriptions: make(map[string][]func(data interface{})),
+		subscriptions: make(map[string][]func(data any)),
 		clientIDChan:  make(chan string, 1),
 	}
 }
@@ -52,8 +52,6 @@ func (rs *RealtimeService) connect() error {
 
 	u.Path = "/api/realtime"
 
-	// log.Printf("Attempting to connect to SSE URL: '%v'", u.String())
-
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return fmt.Errorf("err creating request : '%w'", err)
@@ -71,7 +69,11 @@ func (rs *RealtimeService) connect() error {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				fmt.Printf("[WARN] err closing resp body : '%v'\n", err)
+			}
+		}()
 		return fmt.Errorf("unexpected status code: '%v'", resp.StatusCode)
 	}
 
@@ -87,7 +89,11 @@ func (rs *RealtimeService) connect() error {
 }
 
 func (rs *RealtimeService) readEvents() {
-	defer rs.eventSource.connection.Body.Close()
+	defer func() {
+		if err := rs.eventSource.connection.Body.Close(); err != nil {
+			fmt.Printf("[WARN] err closing resp body : '%v'\n", err)
+		}
+	}()
 
 	for {
 		line, err := rs.eventSource.reader.ReadString('\n')
@@ -128,7 +134,7 @@ func (rs *RealtimeService) readEvents() {
 	}
 }
 
-func (rs *RealtimeService) Subscribe(topic string, callback func(data interface{})) error {
+func (rs *RealtimeService) Subscribe(topic string, callback func(data any)) error {
 	if err := rs.connect(); err != nil {
 		return err
 	}
@@ -155,8 +161,6 @@ func (rs *RealtimeService) submitSubscriptions() error {
 	}
 	rs.mu.RUnlock()
 
-	// log.Printf("Submitting subscriptions with ClientID: '%v'\n", clientID)
-
 	payload := struct {
 		ClientID      string   `json:"clientId"`
 		Subscriptions []string `json:"subscriptions"`
@@ -172,7 +176,8 @@ func (rs *RealtimeService) submitSubscriptions() error {
 
 	// log.Printf("subscription payload: '%v'", string(jsonPayload))
 
-	req, err := http.NewRequest("POST", rs.pb.BaseEndpoint+"/api/realtime", bytes.NewBuffer(jsonPayload))
+	req, err := http.NewRequest("POST", rs.pb.BaseEndpoint+"/api/realtime",
+		bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return fmt.Errorf("err creating request : '%w'", err)
 	}
@@ -185,18 +190,21 @@ func (rs *RealtimeService) submitSubscriptions() error {
 	if err != nil {
 		return fmt.Errorf("err performing request: %w", err)
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("[WARN] err closing resp body : '%v'\n", err)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Printf("err reading body of subscribe request : '%v'\n", err)
 	}
-	// log.Printf("subscription response: status : '%v', body : '%v'\n", resp.StatusCode, string(body))
 
 	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("unexpected status code : '%v', body : '%v'", resp.StatusCode, string(body))
+		return fmt.Errorf("unexpected status code : '%v', body : '%v'",
+			resp.StatusCode, string(body))
 	}
-
-	// log.Printf("subscriptions submitted successfully\n")
 	return nil
 }

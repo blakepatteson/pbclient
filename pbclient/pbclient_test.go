@@ -26,9 +26,11 @@ func TestAuthenticate(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		_, err := authenticate(ADMIN_AUTH_ENDPOINT, "http://0.0.0.0:8080", tt.identity, tt.password)
+		_, err := authenticate(ADMIN_AUTH_ENDPOINT, "http://0.0.0.0:8080",
+			tt.identity, tt.password)
 		if (err != nil) != tt.wantErr {
-			t.Errorf("authenticate() with identity = %v, password = %v, error = %v, wantErr = %v",
+			t.Errorf(
+				"authenticate() with identity = %v, password = %v, error = %v, wantErr = %v",
 				tt.identity, tt.password, err, tt.wantErr)
 		}
 	}
@@ -61,7 +63,8 @@ func TestCreate(t *testing.T) {
 	for _, tt := range tests {
 		out, err := pb.CreateRecord("users", tt.recordData)
 		if (err != nil) != tt.wantErr {
-			t.Errorf("CreateRecord() with recordData = %v, error = %v, wantErr = %v", tt.recordData, err, tt.wantErr)
+			t.Errorf("CreateRecord() with recordData = %v, error = %v, wantErr = %v",
+				tt.recordData, err, tt.wantErr)
 		}
 		if !tt.wantErr {
 			fmt.Printf("CreateRecord Output : '%+v'\n", out)
