@@ -63,7 +63,8 @@ func TestCreate(t *testing.T) {
 	for _, tt := range tests {
 		out, err := pb.CreateRecord("users", tt.recordData)
 		if (err != nil) != tt.wantErr {
-			t.Errorf("CreateRecord() with recordData = %v, error = %v, wantErr = %v",
+			t.Errorf(
+				"CreateRecord() with recordData = %v, error = %v, wantErr = %v",
 				tt.recordData, err, tt.wantErr)
 		}
 		if !tt.wantErr {

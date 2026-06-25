@@ -1,13 +1,13 @@
 package pbclient
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/blakepatteson/gorequests/requests"
 )
 
 type Pocketbase struct {
@@ -24,7 +24,7 @@ type Params struct {
 
 const (
 	MAX_PER_PAGE        = 256
-	ADMIN_AUTH_ENDPOINT = "/api/admins/auth-with-password"
+	ADMIN_AUTH_ENDPOINT = "/api/collections/_superusers/auth-with-password"
 	AUTH_ENDPOINT       = "/api/collections/users/auth-with-password"
 )
 
@@ -51,29 +51,38 @@ func NewPocketbase(baseUrl, un, pw string, isAdmin bool) (*Pocketbase, error) {
 
 func authenticate(authEndpoint, baseEndpoint, id, pw string) (string, error) {
 	authJson := fmt.Appendf(nil, `{"identity":"%v","password":"%v"}`, id, pw)
-	response, err := requests.HttpRequest{
-		Endpoint:    fmt.Sprintf("%v%v", baseEndpoint, authEndpoint),
-		VerbHTTP:    "POST",
-		ContentType: "application/json",
-		JSON:        authJson,
-	}.Do()
-
+	resp, err := http.Post(
+		fmt.Sprintf("%v%v", baseEndpoint, authEndpoint),
+		"application/json",
+		bytes.NewBuffer(authJson),
+	)
 	if err != nil {
-		return "", fmt.Errorf("err authenticating to db : %w", err)
+		return "", fmt.Errorf("err authenticating to db : '%v'", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("err reading response body : '%v'", err)
 	}
 
-	respJson, err := requests.ParseJson(response)
-	if err != nil {
-		return "", err
+	var respJson map[string]any
+	if err := json.Unmarshal(body, &respJson); err != nil {
+		return "", fmt.Errorf("err parsing response JSON : '%v'", err)
 	}
-	return fmt.Sprintf(`Bearer %v`, respJson["token"]), nil
+
+	token, ok := respJson["token"]
+	if !ok {
+		return "", fmt.Errorf("token not found in response")
+	}
+	return fmt.Sprintf(`Bearer %v`, token), nil
 }
 
 func (pb *Pocketbase) getLogs(page int) ([]map[string]any, int, error) {
 	allRecords, totalItems, err := pb.getData("/api/logs/requests/?page=%v",
 		Params{Page: page, Filter: ""})
 	if err != nil {
-		return nil, -1, fmt.Errorf("err getting logs : %w", err)
+		return nil, -1, fmt.Errorf("err getting logs : '%v'", err)
 	}
 	return allRecords, totalItems, nil
 }
@@ -81,27 +90,35 @@ func (pb *Pocketbase) getLogs(page int) ([]map[string]any, int, error) {
 func (pb *Pocketbase) CreateRecord(collectionName, update string) (string, error) {
 	endpoint := fmt.Sprintf("%s/api/collections/%v/records",
 		pb.BaseEndpoint, collectionName)
-	response, err := requests.HttpRequest{
-		Endpoint:    endpoint,
-		ContentType: "application/json",
-		VerbHTTP:    "POST",
-		Auth:        pb.AuthToken,
-		JSON:        []byte(update),
-	}.Do()
 
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBufferString(update))
 	if err != nil {
-		return "", fmt.Errorf("err creating pb db record : %w", err)
+		return "", fmt.Errorf("err creating request : '%v'", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", pb.AuthToken)
+
+	client := &http.Client{}
+	response, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("err creating pb db record : '%v'", err)
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", fmt.Errorf("err reading response body : '%v'", err)
 	}
 
-	result, err := requests.ParseJson(response)
-	if err != nil {
+	var result map[string]any
+	if err := json.Unmarshal(body, &result); err != nil {
 		return "", fmt.Errorf("err parsing resp json : '%v'", err)
 	}
-	if _, ok := result["id"]; ok {
-		return result["id"].(string), nil
+	if id, ok := result["id"]; ok {
+		return id.(string), nil
 	}
 
-	return "", fmt.Errorf("err parsing id from pb db record : %w", err)
+	return "", fmt.Errorf("err parsing id from pb db record")
 }
 
 func (pb *Pocketbase) GetAllLogs() ([]map[string]any, error) {
@@ -164,24 +181,24 @@ func getTypedRecords[T any](
 	if params.Expand != "" {
 		getEndpoint += "&expand=" + url.QueryEscape(params.Expand)
 	}
-	response, err := requests.HttpRequest{
-		Endpoint:    getEndpoint,
-		ContentType: "application/json",
-		VerbHTTP:    "GET",
-		Auth:        pb.AuthToken,
-	}.Do()
-	if err != nil {
-		return nil, 0, fmt.Errorf("err getting data from pb db: %w", err)
-	}
 
-	defer func() {
-		if err := response.Body.Close(); err != nil {
-			fmt.Printf("[WARN] err closing resp body : '%v'\n", err)
-		}
-	}()
+	req, err := http.NewRequest("GET", getEndpoint, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("err creating request : '%v'", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", pb.AuthToken)
+
+	client := &http.Client{}
+	response, err := client.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("err getting data from pb db : '%v'", err)
+	}
+	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return nil, 0, fmt.Errorf("received non-200 response status: %d", response.StatusCode)
+		return nil, 0, fmt.Errorf("received non-200 response status : %v",
+			response.StatusCode)
 	}
 
 	var respMap struct {
@@ -190,7 +207,7 @@ func getTypedRecords[T any](
 	}
 
 	if err := json.NewDecoder(response.Body).Decode(&respMap); err != nil {
-		return nil, 0, fmt.Errorf("err parsing response JSON: %v", err)
+		return nil, 0, fmt.Errorf("err parsing response JSON : %v", err)
 	}
 
 	return respMap.Items, respMap.TotalItems, nil
@@ -207,24 +224,46 @@ func (pb *Pocketbase) getData(
 	if params.Expand != "" {
 		getEndpoint += "&expand=" + url.QueryEscape(params.Expand)
 	}
-	response, err := requests.HttpRequest{
-		Endpoint:    getEndpoint,
-		ContentType: "application/json",
-		VerbHTTP:    "GET",
-		Auth:        pb.AuthToken,
-	}.Do()
+
+	req, err := http.NewRequest("GET", getEndpoint, nil)
 	if err != nil {
-		return nil, 0, fmt.Errorf("err getting data from pb db : %w", err)
+		return nil, 0, fmt.Errorf("err creating request : '%v'", err)
 	}
-	respMap, err := requests.ParseJson(response)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", pb.AuthToken)
+
+	client := &http.Client{}
+	response, err := client.Do(req)
 	if err != nil {
+		return nil, 0, fmt.Errorf("err getting data from pb db : '%v'", err)
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, 0, fmt.Errorf("err reading response body : '%v'", err)
+	}
+
+	var respMap map[string]any
+	if err := json.Unmarshal(body, &respMap); err != nil {
 		return nil, 0, fmt.Errorf("err parsing resp json : '%v'", err)
 	}
+
 	allRecords := []map[string]any{}
-	for _, el := range respMap["items"].([]any) {
-		allRecords = append(allRecords, el.(map[string]any))
+	if items, ok := respMap["items"].([]any); ok {
+		for _, el := range items {
+			if record, ok := el.(map[string]any); ok {
+				allRecords = append(allRecords, record)
+			}
+		}
 	}
-	return allRecords, int(respMap["totalItems"].(float64)), nil
+
+	totalItems := 0
+	if total, ok := respMap["totalItems"].(float64); ok {
+		totalItems = int(total)
+	}
+
+	return allRecords, totalItems, nil
 }
 
 func (pb *Pocketbase) getRecords(
@@ -234,50 +273,85 @@ func (pb *Pocketbase) getRecords(
 }
 
 func (pb *Pocketbase) GetRecordById(collectionName, id string) (map[string]any, error) {
-	response, err := requests.HttpRequest{
-		Endpoint: fmt.Sprintf("%v/api/collections/%v/records/%v",
-			pb.BaseEndpoint, collectionName, id),
-		ContentType: "application/json",
-		VerbHTTP:    "GET",
-		Auth:        pb.AuthToken,
-	}.Do()
+	endpoint := fmt.Sprintf("%v/api/collections/%v/records/%v",
+		pb.BaseEndpoint, collectionName, id)
+
+	req, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("err creating request : '%v'", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", pb.AuthToken)
+
+	client := &http.Client{}
+	response, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("err getting filtered db records : '%v'", err)
 	}
-	return requests.ParseJson(response)
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("err reading response body : '%v'", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("err parsing response JSON : '%v'", err)
+	}
+
+	return result, nil
 }
 
-func (pb *Pocketbase) GetFilteredRecords(
-	collectionName, filter string,
-) ([]map[string]any, error) {
-	response, err := requests.HttpRequest{
-		Endpoint: fmt.Sprintf("%v/api/collections/%v/records?page=1&filter=%v",
-			pb.BaseEndpoint, collectionName, url.QueryEscape(filter)),
-		ContentType: "application/json",
-		VerbHTTP:    "GET",
-		Auth:        pb.AuthToken,
-	}.Do()
+func (pb *Pocketbase) GetFilteredRecords(collectionName, filter string) (
+	[]map[string]any, error,
+) {
+	endpoint := fmt.Sprintf("%v/api/collections/%v/records?page=1&filter=%v",
+		pb.BaseEndpoint, collectionName, url.QueryEscape(filter))
+
+	req, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("err creating request : '%v'", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", pb.AuthToken)
+
+	client := &http.Client{}
+	response, err := client.Do(req)
 	if err != nil {
 		fmt.Println("err getting filtered db records : ", err)
+		return nil, fmt.Errorf("err getting filtered db records : '%v'", err)
 	}
-	respMap, err := requests.ParseJson(response)
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
+		return nil, fmt.Errorf("err reading response body : '%v'", err)
+	}
+
+	var respMap map[string]any
+	if err := json.Unmarshal(body, &respMap); err != nil {
 		return nil, fmt.Errorf("err parsing resp json : '%v'", err)
 	}
+
 	filteredRecords := []map[string]any{}
 	if respMap["items"] != nil {
-		for _, el := range respMap["items"].([]any) {
-			filteredRecords = append(filteredRecords, el.(map[string]any))
+		if items, ok := respMap["items"].([]any); ok {
+			for _, el := range items {
+				if record, ok := el.(map[string]any); ok {
+					filteredRecords = append(filteredRecords, record)
+				}
+			}
 		}
 	} else {
-		return nil, fmt.Errorf("err getting filtered records from pb db : %w", err)
+		return nil, fmt.Errorf("err getting filtered records from pb db")
 	}
 	return filteredRecords, nil
 }
 
-func (pb *Pocketbase) GetAllRecords(
-	collectionName, filter, expand string,
-) ([]map[string]any, error) {
+func (pb *Pocketbase) GetAllRecords(collectionName, filter, expand string) (
+	[]map[string]any, error,
+) {
 	params := Params{Page: 1, Expand: expand, Filter: filter}
 	results, totRecs, err := pb.getRecords(collectionName, params)
 	if err != nil {
@@ -305,30 +379,40 @@ func (pb *Pocketbase) GetAllRecords(
 func (pb *Pocketbase) UpdateRecord(collectionName, update, id string) (string, error) {
 	endpoint := fmt.Sprintf("%v/api/collections/%v/records/%v",
 		pb.BaseEndpoint, collectionName, id)
-	response, err := requests.HttpRequest{
-		Endpoint:    endpoint,
-		ContentType: "application/json",
-		VerbHTTP:    "PATCH",
-		Auth:        pb.AuthToken,
-		JSON:        []byte(update),
-	}.Do()
+
+	req, err := http.NewRequest("PATCH", endpoint, bytes.NewBufferString(update))
 	if err != nil {
-		return "", fmt.Errorf("err updating pb db record : %w", err)
+		return "", fmt.Errorf("err creating request : '%v'", err)
 	}
-	result, err := requests.ParseJson(response)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", pb.AuthToken)
+
+	client := &http.Client{}
+	response, err := client.Do(req)
 	if err != nil {
+		return "", fmt.Errorf("err updating pb db record : '%v'", err)
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", fmt.Errorf("err reading response body : '%v'", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(body, &result); err != nil {
 		return "", fmt.Errorf("err parsing resp json : '%v'", err)
 	}
-	if _, ok := result["id"]; ok {
-		return result["id"].(string), nil
+	if id, ok := result["id"]; ok {
+		return id.(string), nil
 	}
-	return "", fmt.Errorf("err parsing id from update pb db record : %w", err)
+	return "", fmt.Errorf("err parsing id from update pb db record")
 }
 
 func ParseTimePB(input string) (*time.Time, error) {
 	time, err := time.Parse("2006-01-02 15:04:05.999Z", input)
 	if err != nil {
-		return nil, fmt.Errorf("err parsing time : %w", err)
+		return nil, fmt.Errorf("err parsing time : '%v'", err)
 	}
 	return &time, nil
 }
@@ -336,28 +420,39 @@ func ParseTimePB(input string) (*time.Time, error) {
 func (pb *Pocketbase) DeleteRecord(collectionName, recordId string) (int, error) {
 	deleteEndpoint := fmt.Sprintf("%v/api/collections/%v/records/%v",
 		pb.BaseEndpoint, collectionName, recordId)
-	response, err := requests.HttpRequest{
-		Endpoint:    deleteEndpoint,
-		ContentType: "application/json",
-		VerbHTTP:    "DELETE",
-		Auth:        pb.AuthToken,
-	}.Do()
+
+	req, err := http.NewRequest("DELETE", deleteEndpoint, nil)
 	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("err deleting pb db rec : '%v'", err)
+		return http.StatusBadRequest, fmt.Errorf("err creating request : '%v'", err)
 	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", pb.AuthToken)
+
+	client := &http.Client{}
+	response, err := client.Do(req)
+	if err != nil {
+		return http.StatusBadRequest, fmt.Errorf("err deleting PB DB rec : '%v'", err)
+	}
+	defer response.Body.Close()
+
 	return response.StatusCode, nil
 }
 
 func AuthRefresh(authToken, baseEndpoint string) (*Pocketbase, error) {
 	endpt := fmt.Sprintf("%v/api/collections/users/auth-refresh", baseEndpoint)
-	_, err := requests.HttpRequest{
-		Endpoint: endpt,
-		Auth:     authToken,
-		VerbHTTP: "POST",
-	}.Do()
+
+	req, err := http.NewRequest("POST", endpt, nil)
+	if err != nil {
+		return nil, fmt.Errorf("err creating request : '%v'", err)
+	}
+	req.Header.Set("Authorization", authToken)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("err refreshing auth : '%v'", err)
 	}
+	defer resp.Body.Close()
 
 	return &Pocketbase{BaseEndpoint: baseEndpoint, AuthToken: authToken}, nil
 }

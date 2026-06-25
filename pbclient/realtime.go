@@ -52,6 +52,8 @@ func (rs *RealtimeService) connect() error {
 
 	u.Path = "/api/realtime"
 
+	// log.Printf("Attempting to connect to SSE URL: '%v'", u.String())
+
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return fmt.Errorf("err creating request : '%w'", err)
@@ -69,11 +71,7 @@ func (rs *RealtimeService) connect() error {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				fmt.Printf("[WARN] err closing resp body : '%v'\n", err)
-			}
-		}()
+		resp.Body.Close()
 		return fmt.Errorf("unexpected status code: '%v'", resp.StatusCode)
 	}
 
@@ -89,11 +87,7 @@ func (rs *RealtimeService) connect() error {
 }
 
 func (rs *RealtimeService) readEvents() {
-	defer func() {
-		if err := rs.eventSource.connection.Body.Close(); err != nil {
-			fmt.Printf("[WARN] err closing resp body : '%v'\n", err)
-		}
-	}()
+	defer rs.eventSource.connection.Body.Close()
 
 	for {
 		line, err := rs.eventSource.reader.ReadString('\n')
@@ -161,6 +155,8 @@ func (rs *RealtimeService) submitSubscriptions() error {
 	}
 	rs.mu.RUnlock()
 
+	// log.Printf("Submitting subscriptions with ClientID: '%v'\n", clientID)
+
 	payload := struct {
 		ClientID      string   `json:"clientId"`
 		Subscriptions []string `json:"subscriptions"`
@@ -190,21 +186,20 @@ func (rs *RealtimeService) submitSubscriptions() error {
 	if err != nil {
 		return fmt.Errorf("err performing request: %w", err)
 	}
-
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			fmt.Printf("[WARN] err closing resp body : '%v'\n", err)
-		}
-	}()
+	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Printf("err reading body of subscribe request : '%v'\n", err)
 	}
+	// log.Printf("subscription response: status : '%v', body : '%v'\n",
+	//  resp.StatusCode, string(body))
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("unexpected status code : '%v', body : '%v'",
 			resp.StatusCode, string(body))
 	}
+
+	// log.Printf("subscriptions submitted successfully\n")
 	return nil
 }
