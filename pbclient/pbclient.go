@@ -128,13 +128,26 @@ func (pb *Pocketbase) CreateRecord(collectionName, update string) (string, error
 
 	var result map[string]any
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("err parsing resp json : '%v'", err)
+		return "", fmt.Errorf("err parsing resp json : '%v' (status %v, body : '%v')",
+			err, response.StatusCode, string(body))
 	}
 	if id, ok := result["id"]; ok {
 		return id.(string), nil
 	}
 
-	return "", fmt.Errorf("err parsing id from pb db record")
+	return "", fmt.Errorf("err parsing id from create pb db record : %v",
+		recordErrDetail(response.StatusCode, result, body))
+}
+
+func recordErrDetail(statusCode int, result map[string]any, body []byte) string {
+	if msg, ok := result["message"].(string); ok {
+		out := fmt.Sprintf("status %v : %v", statusCode, msg)
+		if data, ok := result["data"].(map[string]any); ok && len(data) > 0 {
+			out += fmt.Sprintf(" - fields : %v", data)
+		}
+		return out
+	}
+	return fmt.Sprintf("status %v, body : '%v'", statusCode, string(body))
 }
 
 func (pb *Pocketbase) GetAllLogs() ([]map[string]any, error) {
@@ -437,12 +450,14 @@ func (pb *Pocketbase) UpdateRecord(collectionName, update, id string) (string, e
 
 	var result map[string]any
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("err parsing resp json : '%v'", err)
+		return "", fmt.Errorf("err parsing resp json : '%v' (status %v, body : '%v')",
+			err, response.StatusCode, string(body))
 	}
 	if id, ok := result["id"]; ok {
 		return id.(string), nil
 	}
-	return "", fmt.Errorf("err parsing id from update pb db record")
+	return "", fmt.Errorf("err parsing id from update pb db record : %v",
+		recordErrDetail(response.StatusCode, result, body))
 }
 
 func ParseTimePB(input string) (*time.Time, error) {
